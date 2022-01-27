@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from MultilayerPerceptron.ActivationFunctions import sigmoid, relu
+from MultilayerPerceptron.MLP import MLP
 from Perceptron.Perceptron import Perceptron
 from MultilayerPerceptron.Layer import Layer
 
@@ -12,9 +13,20 @@ y_train = []
 y_test = []
 
 if __name__ == '__main__':
-    l = Layer(input_dim=3, output_dim=2, next_layer=Layer(2, 2), func="relu")
-    print(l)
-    print(l.feed_layer([.25, .5, .9]))
+    # print(f'{[[[1]],2,3,4,5, 6][1:6]}')
+    # hidden_layer_1 = Layer(input_dim=2, neurons=2, func="relu")
+
+    net = MLP()
+    hidden_layer_1 = Layer(input_dim=2, neurons=2, func="relu")
+    # hidden_layer_2 = Layer(input_dim=2, neurons=3, func="tanh")
+    output_layer = Layer(input_dim=2, neurons=1, func="sigmoid")
+
+    net.add_layer(hidden_layer_1)
+    # net.add_layer(hidden_layer_2)
+    net.add_layer(output_layer)
+
+    net.optimize([[0, 0], [0, 1], [1, 0], [1, 1]], [[0], [1], [1], [0]], 50)
+
     # data = pd.read_csv("./sonar.all-data.csv", header=None)
     # data = data.sample(frac=1)
     #
