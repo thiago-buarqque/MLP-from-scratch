@@ -4,22 +4,27 @@ from MultilayerPerceptron import ActivationFunctions
 
 
 class Layer:
-    def __init__(self, input_dim, neurons, func='sigmoid', next_layer=None):
+    def __init__(self, input_dim, neurons, func='sigmoid', next_layer=None, initial_weights=None, initial_biases=None):
         self.input_dim = input_dim
         self.output_dim = neurons
-
-        self.weights = [np.random.uniform(-2, 2, (neurons, input_dim))]
-        # self.weights = []
-
-        # Adding biases
-        for i in range(neurons):
-            self.weights.append(np.random.uniform(-1, 1))
-
-        # print(f'INitial weights: {self.weights}')
 
         self.forward_pass_input = []
         self.layer_output = []
         self.deltas = []
+        self.deltas.append(list(np.zeros((neurons, input_dim))))
+
+        if initial_weights is None:
+            self.weights = [np.random.uniform(-2, 2, (neurons, input_dim))]
+        else:
+            self.weights = [initial_weights]
+
+        # Adding biases
+        for i in range(neurons):
+            if initial_biases is None:
+                self.weights.append(np.random.uniform(-1, 1))
+            else:
+                self.weights.append(initial_biases[i])
+            self.deltas.append(0)
 
         self.activation_function = ActivationFunctions.sigmoid
         self.activation_derivative = ActivationFunctions.sigmoid_derivative
@@ -39,8 +44,8 @@ class Layer:
         self.next_layer = next_layer
 
     def feed_layer(self, input_data):
-        # if len(input_data) != self.input_dim:
-        #     raise TypeError("Input data does not have the same dimension as layer input.")
+        if len(input_data) != self.input_dim:
+            raise TypeError("Input data does not have the same dimension as layer input.")
 
         self.forward_pass_input = input_data
 

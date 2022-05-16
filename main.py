@@ -17,9 +17,13 @@ if __name__ == '__main__':
     # hidden_layer_1 = Layer(input_dim=2, neurons=2, func="relu")
 
     net = MLP()
-    hidden_layer_1 = Layer(input_dim=2, neurons=2, func="relu")
+    hidden_layer_1 = Layer(input_dim=2, neurons=2, func="sigmoid",
+                           initial_weights=None,
+                           initial_biases=None)
     # hidden_layer_2 = Layer(input_dim=2, neurons=3, func="tanh")
-    output_layer = Layer(input_dim=2, neurons=1, func="sigmoid")
+    output_layer = Layer(input_dim=2, neurons=1, func="sigmoid",
+                         initial_weights=None,
+                         initial_biases=None)
 
     net.add_layer(hidden_layer_1)
     # net.add_layer(hidden_layer_2)

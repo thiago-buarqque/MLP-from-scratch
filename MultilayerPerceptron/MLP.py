@@ -15,7 +15,7 @@ class MLP:
         self.input_dim = 0
 
         self.layers = []
-        self.lr = 0.05
+        self.lr = 0.5
 
     def add_layer(self, layer):
         if len(self.layers) == 0:
@@ -25,7 +25,8 @@ class MLP:
         for i in range(len(self.layers) - 1):
             if self.layers[i].next_layer is None:
                 self.layers[i].set_next_layer(self.layers[i + 1])
-                self.layers[i].layer_name = f'{i}'
+            self.layers[i].layer_name = f'{i}'
+        self.layers[-1].layer_name = f'{len(self.layers) - 1}'
 
     def get_layers(self):
         print(f'Printando {len(self.layers)} camadas')
@@ -33,50 +34,64 @@ class MLP:
             print(layer)
 
     def backward_propagate_error(self, expected_output):
+        # https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/
         for i in range(len(self.layers) - 1, -1, -1):
             curr_layer = self.layers[i]
-
-            layer_errors = list()
+            # layer_errors = list()
             layer_weights = curr_layer.get_weights()
 
             # It's a hidden layer
             if i != len(self.layers) - 1:
-                for j, neuron_weights in enumerate(layer_weights):
-                    error = 0.0
+                next_layer = self.layers[i + 1]
 
-                    next_layer_weights = self.layers[i + 1].get_weights()
-                    next_layer_deltas = self.layers[i + 1].deltas
-                    for k, next_layer_neuron in enumerate(next_layer_weights):
-                        error += next_layer_neuron[j] * next_layer_deltas[k]
+                layer_output = curr_layer.layer_output
+                # layer_input = curr_layer.forward_pass_input
+                for j, neuron in enumerate(layer_weights):
+                    for k, neuron_weights in enumerate(neuron):
+                        next_layer_relative_error = 0
+                        next_layer_weights = np.array(next_layer.get_weights()).transpose(1, 0)
 
-                    layer_errors.append(error)
+                        transposed_next_layer_deltas = np.array(next_layer.deltas[0]).transpose(1, 0)
+                        for l, neuron_delta in enumerate(transposed_next_layer_deltas):
+                            next_layer_relative_error += transposed_next_layer_deltas[l][j] * next_layer_weights[l][j]
+
+                        delta_h_i__net_h_i = curr_layer.activation_derivative(layer_output[j])
+                        # delt_net_h_i__delta_w_i = layer_input[j]
+
+                        curr_layer.deltas[0][j][
+                            k] = delta_h_i__net_h_i * next_layer_relative_error
+                    # Adding bias delta
+                    curr_layer.deltas[j + 1] = curr_layer.deltas[i + 1] - curr_layer.activation_derivative(
+                        layer_output[i])
             else:
-                for j, out_neuron in enumerate(curr_layer.layer_output):
-                    layer_errors.append(out_neuron - expected_output[j])
+                layer_output = curr_layer.layer_output
+                for j, neuron in enumerate(layer_weights):
+                    for k, neuron_weights in enumerate(neuron):
+                        output_delta = -(expected_output[j] - layer_output[j])
+                        neuron_input_delta = curr_layer.activation_derivative(layer_output[j])
+                        # Adding weight delta
+                        # The total net input of o1 change with respect to w_i is used directly in the weight update
+                        # so it's easier to calculate the hidden layer delta
+                        curr_layer.deltas[0][j][k] = output_delta * neuron_input_delta
+                    # Adding bias delta
+                    curr_layer.deltas[j + 1] = curr_layer.deltas[j + 1] - curr_layer.activation_derivative(
+                        layer_output[j])
 
-            for j, out_neuron in enumerate(curr_layer.layer_output):
-                curr_layer.deltas.append(layer_errors[j] * curr_layer.activation_derivative(out_neuron))
+    def update_params(self):
+        for i in range(len(self.layers) - 1, -1, -1):
+            curr_layer = self.layers[i]
+            inputs = self.layers[i].forward_pass_input
 
-    def update_params(self, net_input):
-        for i, layer in enumerate(self.layers):
-            inputs = net_input
-            if i != 0:
-                inputs = self.layers[i - 1].layer_output
+            weights, biases = curr_layer.get_weights_and_biases()
 
-            weights, biases = layer.get_weights_and_biases()
-
-            # print(f'Weights before: {weights}')
             # Updating weights
-            for j, neuron_weights in enumerate(weights):
-                for k in range(len(inputs)):
-                    neuron_weights[k] = neuron_weights[k] - (self.lr * layer.deltas[j] * inputs[k])
-            # print(f'Weights after: {weights}')
+            for j, neuron in enumerate(weights):
+                for k in range(len(neuron)):
+                    neuron[k] = neuron[k] - (self.lr * curr_layer.deltas[0][j][k] * inputs[j])
 
             # Updating biases
-            # print(f'Biases before: {biases}')
             for j in range(len(biases)):
-                biases[j] = biases[j] - (self.lr * layer.deltas[j])
-            # print(f'Biases after: {biases}')
+                biases[j] = biases[j] - (self.lr * curr_layer.deltas[j + 1])
 
     def optimize(self, x, y, epochs):
         if len(x) == 0:
@@ -90,14 +105,14 @@ class MLP:
                 next_layer_input_data = sample
                 for k, layer in enumerate(self.layers):
                     next_layer_input_data = layer.feed_layer(next_layer_input_data)
+                # Depois alterar pela funcao degral (acho que eh a degral kk)
+                # net_pred = 1 if next_layer_input_data > 0.5 else 0
 
-                net_pred = 1 if next_layer_input_data > 0.5 else 0
-
-                predictions.append(net_pred)
+                predictions.append(next_layer_input_data)
                 # print(f'Pred for sample {j+1}: {next_layer_input_data}')
 
                 self.backward_propagate_error(y[j])
-                self.update_params(sample)
+                self.update_params()
 
             print(f'Epoch={i} Loss: {log_loss(np.array(y).ravel(), np.array(predictions).ravel())}'
                   f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}'
