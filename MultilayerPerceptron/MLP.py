@@ -15,7 +15,7 @@ class MLP:
         self.input_dim = 0
 
         self.layers = []
-        self.lr = 0.5
+        self.lr = 0.25
 
     def add_layer(self, layer):
         if len(self.layers) == 0:
@@ -49,11 +49,11 @@ class MLP:
                 for j, neuron in enumerate(layer_weights):
                     for k, neuron_weights in enumerate(neuron):
                         next_layer_relative_error = 0
-                        next_layer_weights = np.array(next_layer.get_weights()).transpose(1, 0)
+                        next_layer_weights = next_layer.get_weights()
 
-                        transposed_next_layer_deltas = np.array(next_layer.deltas[0]).transpose(1, 0)
-                        for l, neuron_delta in enumerate(transposed_next_layer_deltas):
-                            next_layer_relative_error += transposed_next_layer_deltas[l][j] * next_layer_weights[l][j]
+                        next_layer_deltas = next_layer.deltas[0]
+                        for l in range(len(next_layer_weights)):
+                            next_layer_relative_error += next_layer_deltas[l][j] * next_layer_weights[l][j]
 
                         delta_h_i__net_h_i = curr_layer.activation_derivative(layer_output[j])
                         # delt_net_h_i__delta_w_i = layer_input[j]
@@ -87,7 +87,7 @@ class MLP:
             # Updating weights
             for j, neuron in enumerate(weights):
                 for k in range(len(neuron)):
-                    neuron[k] = neuron[k] - (self.lr * curr_layer.deltas[0][j][k] * inputs[j])
+                    neuron[k] = neuron[k] - (self.lr * curr_layer.deltas[0][j][k] * inputs[k])
 
             # Updating biases
             for j in range(len(biases)):
@@ -105,7 +105,6 @@ class MLP:
                 next_layer_input_data = sample
                 for k, layer in enumerate(self.layers):
                     next_layer_input_data = layer.feed_layer(next_layer_input_data)
-                # Depois alterar pela funcao degral (acho que eh a degral kk)
                 # net_pred = 1 if next_layer_input_data > 0.5 else 0
 
                 predictions.append(next_layer_input_data)
