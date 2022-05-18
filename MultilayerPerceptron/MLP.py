@@ -25,28 +25,26 @@ class MLP:
         for i in range(len(self.layers) - 1):
             if self.layers[i].next_layer is None:
                 self.layers[i].set_next_layer(self.layers[i + 1])
+            self.layers[i+1].set_input_dim(self.layers[i].output_dim)
             self.layers[i].layer_name = f'{i}'
         self.layers[-1].layer_name = f'{len(self.layers) - 1}'
 
     def get_layers(self):
-        print(f'Printando {len(self.layers)} camadas')
         for layer in self.layers:
             print(layer)
 
     def backward_propagate_error(self, expected_output):
         # https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/
         for i in range(len(self.layers) - 1, -1, -1):
-            curr_layer = self.layers[i]
-            # layer_errors = list()
-            layer_weights = curr_layer.get_weights()
+            current_layer = self.layers[i]
+            current_layer_weights = current_layer.get_weights()
 
             # It's a hidden layer
             if i != len(self.layers) - 1:
                 next_layer = self.layers[i + 1]
 
-                layer_output = curr_layer.layer_output
-                # layer_input = curr_layer.forward_pass_input
-                for j, neuron in enumerate(layer_weights):
+                current_layer_output = current_layer.layer_output
+                for j, neuron in enumerate(current_layer_weights):
                     for k, neuron_weights in enumerate(neuron):
                         next_layer_relative_error = 0
                         next_layer_weights = next_layer.get_weights()
@@ -55,43 +53,46 @@ class MLP:
                         for l in range(len(next_layer_weights)):
                             next_layer_relative_error += next_layer_deltas[l][j] * next_layer_weights[l][j]
 
-                        delta_h_i__net_h_i = curr_layer.activation_derivative(layer_output[j])
-                        # delt_net_h_i__delta_w_i = layer_input[j]
+                        delta_h_i__net_h_i = current_layer.activation_derivative(current_layer_output[j])
 
-                        curr_layer.deltas[0][j][
-                            k] = delta_h_i__net_h_i * next_layer_relative_error
+                        current_layer.deltas[0][j][k] = delta_h_i__net_h_i * next_layer_relative_error
                     # Adding bias delta
-                    curr_layer.deltas[j + 1] = curr_layer.deltas[i + 1] - curr_layer.activation_derivative(
-                        layer_output[i])
+                    current_layer.deltas[j + 1] -= current_layer.activation_derivative(current_layer_output[i])
             else:
-                layer_output = curr_layer.layer_output
-                for j, neuron in enumerate(layer_weights):
+                current_layer_output = current_layer.layer_output
+                for j, neuron in enumerate(current_layer_weights):
                     for k, neuron_weights in enumerate(neuron):
-                        output_delta = -(expected_output[j] - layer_output[j])
-                        neuron_input_delta = curr_layer.activation_derivative(layer_output[j])
+                        # EQ1
+                        output_delta = -(expected_output[j] - current_layer_output[j])
+
+                        # EQ2
+                        neuron_input_delta = current_layer.activation_derivative(current_layer_output[j])
+
                         # Adding weight delta
-                        # The total net input of o1 change with respect to w_i is used directly in the weight update
-                        # so it's easier to calculate the hidden layer delta
-                        curr_layer.deltas[0][j][k] = output_delta * neuron_input_delta
+                        # The total net input of o_i change with respect to w_i (EQ3) is used directly in the weight
+                        # update so it's easier to calculate the hidden layer delta
+                        current_layer.deltas[0][j][k] = output_delta * neuron_input_delta
+
                     # Adding bias delta
-                    curr_layer.deltas[j + 1] = curr_layer.deltas[j + 1] - curr_layer.activation_derivative(
-                        layer_output[j])
+                    current_layer.deltas[j + 1] -= current_layer.activation_derivative(current_layer_output[j])
 
     def update_params(self):
         for i in range(len(self.layers) - 1, -1, -1):
-            curr_layer = self.layers[i]
-            inputs = self.layers[i].forward_pass_input
+            layer = self.layers[i]
+            forward_pass_input = self.layers[i].forward_pass_input
 
-            weights, biases = curr_layer.get_weights_and_biases()
+            weights, biases = layer.get_weights_and_biases()
 
             # Updating weights
             for j, neuron in enumerate(weights):
                 for k in range(len(neuron)):
-                    neuron[k] = neuron[k] - (self.lr * curr_layer.deltas[0][j][k] * inputs[k])
+                    # forward_pass_input[k] refer to the EQ3 for both output and hidden layer
+                    neuron[k] = neuron[k] - (
+                            self.lr * layer.deltas[0][j][k] * forward_pass_input[k])
 
             # Updating biases
             for j in range(len(biases)):
-                biases[j] = biases[j] - (self.lr * curr_layer.deltas[j + 1])
+                biases[j] = biases[j] - (self.lr * layer.deltas[j + 1])
 
     def optimize(self, x, y, epochs):
         if len(x) == 0:
@@ -105,10 +106,8 @@ class MLP:
                 next_layer_input_data = sample
                 for k, layer in enumerate(self.layers):
                     next_layer_input_data = layer.feed_layer(next_layer_input_data)
-                # net_pred = 1 if next_layer_input_data > 0.5 else 0
 
                 predictions.append(next_layer_input_data)
-                # print(f'Pred for sample {j+1}: {next_layer_input_data}')
 
                 self.backward_propagate_error(y[j])
                 self.update_params()

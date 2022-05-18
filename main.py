@@ -41,13 +41,13 @@ if __name__ == '__main__':
     net = MLP()
     hidden_layer_1 = Layer(input_dim=len(x_train[0]), neurons=10, func="sigmoid")
     # hidden_layer_2 = Layer(input_dim=2, neurons=3, func="tanh")
-    output_layer = Layer(input_dim=10, neurons=len(y_train[0]), func="sigmoid")
+    output_layer = Layer(neurons=len(y_train[0]), func="sigmoid")
 
     net.add_layer(hidden_layer_1)
     # net.add_layer(hidden_layer_2)
     net.add_layer(output_layer)
 
-    net.optimize(x_train, y_train, 1000)
+    net.optimize(x_train, y_train, 500)
 
     #
     # perceptron = Perceptron(input_dim=len(x_train[0]), lr=0.01)

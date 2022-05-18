@@ -1,30 +1,32 @@
+from typing import Union
+
 import numpy as np
 
 from MultilayerPerceptron import ActivationFunctions
 
 
 class Layer:
-    def __init__(self, input_dim, neurons, func='sigmoid', next_layer=None, initial_weights=None, initial_biases=None):
+    def __init__(self,
+                 neurons: int,
+                 func: str = 'sigmoid',
+                 initial_weights: Union[dict[float], None] = None,
+                 input_dim=None,
+                 next_layer=None
+                 ):
         self.input_dim = input_dim
         self.output_dim = neurons
 
         self.forward_pass_input = []
         self.layer_output = []
         self.deltas = []
-        self.deltas.append(list(np.zeros((neurons, input_dim))))
 
-        if initial_weights is None:
-            self.weights = [np.random.uniform(-2, 2, (neurons, input_dim))]
-        else:
+        if input_dim is not None:
+            self.set_input_dim(input_dim)
+            self.set_input_dim(input_dim)
+
+        self.weights = []
+        if initial_weights is not None:
             self.weights = [initial_weights]
-
-        # Adding biases
-        for i in range(neurons):
-            if initial_biases is None:
-                self.weights.append(np.random.uniform(-1, 1))
-            else:
-                self.weights.append(initial_biases[i])
-            self.deltas.append(0)
 
         self.activation_function = ActivationFunctions.sigmoid
         self.activation_derivative = ActivationFunctions.sigmoid_derivative
@@ -40,6 +42,19 @@ class Layer:
         else:
             raise ValueError("Invalid activation function.")
 
+    def set_input_dim(self, input_dim):
+        if len(self.deltas) == 0:
+            self.deltas.append(list(np.zeros((self.output_dim, input_dim))))
+
+        if len(self.weights) == 0:
+            self.weights = [np.random.uniform(-2, 2, (self.output_dim, input_dim))]
+            self.generate_biases()
+
+    def generate_biases(self):
+        for i in range(self.output_dim):
+            self.weights.append(np.random.uniform(-1, 1))
+            self.deltas.append(0)
+
     def set_next_layer(self, next_layer):
         self.next_layer = next_layer
 
@@ -52,7 +67,6 @@ class Layer:
         weights = self.weights[0]
         biases = self.weights[1:len(self.weights)]
 
-        # print(f'Input data: {input_data}')
         next_layer_input = np.zeros(self.output_dim)
         # Calculating weights multiplication
         for i, in_data in enumerate(input_data):
