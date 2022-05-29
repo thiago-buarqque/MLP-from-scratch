@@ -18,13 +18,14 @@ class Layer:
 
         self.forward_pass_input = []
         self.layer_output = []
+
+        self.weights = []
         self.deltas = []
+        self.lrs = []
 
         if input_dim is not None:
             self.set_input_dim(input_dim)
-            self.set_input_dim(input_dim)
 
-        self.weights = []
         if initial_weights is not None:
             self.weights = [initial_weights]
 
@@ -46,6 +47,9 @@ class Layer:
         if len(self.deltas) == 0:
             self.deltas.append(list(np.zeros((self.output_dim, input_dim))))
 
+        if len(self.lrs) == 0:
+            self.lrs.append(list(np.zeros((self.output_dim, input_dim))))
+
         if len(self.weights) == 0:
             self.weights = [np.random.uniform(-2, 2, (self.output_dim, input_dim))]
             self.generate_biases()
@@ -54,13 +58,14 @@ class Layer:
         for i in range(self.output_dim):
             self.weights.append(np.random.uniform(-1, 1))
             self.deltas.append(0)
+            self.lrs.append(0)
 
     def set_next_layer(self, next_layer):
         self.next_layer = next_layer
 
     def feed_layer(self, input_data):
         if len(input_data) != self.input_dim:
-            raise TypeError("Input data does not have the same dimension as layer input.")
+            raise TypeError(f"Input data does not have the same dimension as layer input. ({len(input_data), self.input_dim})")
 
         self.forward_pass_input = input_data
 
