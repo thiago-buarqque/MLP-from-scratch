@@ -16,3 +16,14 @@ def relu(x):
 
 def relu_derivative(x):
     return 0 if x < 0 else 1
+
+
+ACTIVATION_FUNCTIONS = {
+    'sigmoid': sigmoid,
+    'relu': relu
+}
+
+ACTIVATION_FUNCTIONS_DERIVATIVES = {
+    'sigmoid': sigmoid_derivative,
+    'relu': relu_derivative
+}

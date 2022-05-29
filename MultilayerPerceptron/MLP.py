@@ -3,6 +3,9 @@ import math
 import numpy as np
 from sklearn.metrics import log_loss
 
+from MultilayerPerceptron.Layer import Layer
+from MultilayerPerceptron.Neuron import Neuron
+
 
 def accuracy_metric(actual, predicted):
     correct = 0
@@ -17,11 +20,13 @@ def param_moving_avg(last_step_size, delta):
 
 
 class MLP:
-    def __init__(self, lr=0.01):
+    def __init__(self, lr=0.01, classify_function=None):
         self.input_dim = 0
 
         self.layers = []
         self.lr = lr
+
+        self.classify_function = classify_function
 
     def add_layer(self, layer):
         if len(self.layers) == 0:
@@ -42,101 +47,77 @@ class MLP:
     def backward_propagate_error(self, expected_output):
         # https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/
         for i in range(len(self.layers) - 1, -1, -1):
-            current_layer = self.layers[i]
-            current_layer_weights = current_layer.get_weights()
+            layer = self.layers[i]
+            layer_neurons: [Neuron] = layer.get_neurons()
 
             # It's a hidden layer
             if i != len(self.layers) - 1:
-                next_layer = self.layers[i + 1]
+                next_layer: Layer = self.layers[i + 1]
 
-                current_layer_output = current_layer.layer_output
-                for j, neuron in enumerate(current_layer_weights):
+                layer_output = layer.layer_output
+                for j, neuron in enumerate(layer_neurons):
                     # The neuron output relative error
                     next_layer_relative_error = 0
 
-                    next_layer_weights = next_layer.get_weights()
-                    next_layer_deltas = next_layer.deltas[0]
+                    next_layer_neurons: [Neuron] = next_layer.get_neurons()
 
-                    for l in range(len(next_layer_weights)):
-                        next_layer_relative_error += next_layer_deltas[l][j] * next_layer_weights[l][j]
+                    for k, _neuron in enumerate(next_layer_neurons):
+                        next_layer_relative_error += _neuron.delta * _neuron.weights[j]
 
-                    for k, neuron_weights in enumerate(neuron):
-                        # How much the output of h_i change with respect the neuron input
-                        neuron_input_delta = current_layer.activation_derivative(current_layer_output[j])
+                    # How much the output of h_i change with respect the neuron input
+                    neuron_input_delta = layer.activation_derivative(layer_output[j])
 
-                        # Calcualting weight delta
+                    # Calculate weight delta
 
-                        # The "How much the total neuron input changes with respect to w_i" value
-                        # is calculated when updating the parameter. This is just the output
-                        # from previous layer related to w_i
-                        current_layer.deltas[0][j][k] = neuron_input_delta * next_layer_relative_error
-
-                    # Calcualting bias delta
-                    # current_layer.deltas[j + 1] = current_layer.activation_derivative(current_layer_output[i])
-                    current_layer.deltas[j + 1] = current_layer.deltas[0][j][0]
+                    # The "How much the total neuron input changes with respect to w_i" value
+                    # is calculated when updating the parameter. This is just the output
+                    # from previous layer related to w_i
+                    neuron.delta = neuron_input_delta * next_layer_relative_error
             else:
-                current_layer_output = current_layer.layer_output
-                for j, neuron in enumerate(current_layer_weights):
-                    for k, neuron_weights in enumerate(neuron):
-                        # How much the error change with respect to the output
-                        output_delta = current_layer_output[j] - expected_output[j]
+                layer_output = layer.layer_output
+                for j, neuron in enumerate(layer_neurons):
+                    # How much the error change with respect to the output
+                    output_delta = layer_output[j] - expected_output[j]
 
-                        # How much the output of o_i change with respect the neuron input
-                        neuron_input_delta = current_layer.activation_derivative(current_layer_output[j])
+                    # How much the output of o_i change with respect the neuron input
+                    neuron_input_delta = layer.activation_derivative(layer_output[j])
 
-                        # Calculating weight delta
+                    # Calculate neuron delta
 
-                        # The "How much the total neuron input changes with respect to w_i" value
-                        # is calculated when updating the parameter. This is just the output
-                        # from previous layer related to w_i
-                        current_layer.deltas[0][j][k] = output_delta * neuron_input_delta
-
-                    # Calculating bias delta
-                    # current_layer.deltas[j + 1] = current_layer.activation_derivative(current_layer_output[j])
-                    current_layer.deltas[j + 1] = current_layer.deltas[0][j][0]
+                    # The "How much the total neuron input changes with respect to w_i" value
+                    # is calculated when updating the parameter. This is just the output
+                    # from previous layer related to w_i
+                    neuron.set_delta(output_delta * neuron_input_delta)
 
     def update_params(self):
-        for i in range(len(self.layers) - 1, -1, -1):
-            layer = self.layers[i]
-            forward_pass_input = self.layers[i].forward_pass_input
+        for i in reversed(range(len(self.layers))):
+            layer: Layer = self.layers[i]
 
-            weights, biases = layer.get_weights_and_biases()
+            forward_pass_input = layer.get_forward_pass_input()
 
-            # Updating weights
-            for j, neuron in enumerate(weights):
-                for k in range(len(neuron)):
-                    param_last_step_size = layer.moving_avg[0][j][k]
+            neurons: [Neuron] = layer.get_neurons()
 
-                    # forward_pass_input[k] is "How much the total neuron input changes with respect to w_i"
-                    param_gradient = layer.deltas[0][j][k] * forward_pass_input[k]
+            for j, neuron in enumerate(neurons):
+                for k in range(len(neuron.weights)):
+                    last_moving_avg = neuron.moving_avg[k]
+
+                    if k <= len(forward_pass_input) - 1:
+                        # forward_pass_input[j] is "How much the total neuron input changes with respect to w_i"
+                        param_gradient = neuron.delta * forward_pass_input[k]
+                    else:
+                        # It's the neuron bias
+                        param_gradient = neuron.delta
 
                     new_moving_avg = param_moving_avg(
-                        param_last_step_size,
+                        last_moving_avg,
                         param_gradient
                     )
 
-                    layer.moving_avg[0][j][k] = new_moving_avg
+                    neuron.moving_avg[k] = new_moving_avg
 
                     step_size = self.lr / (1e-8 + math.sqrt(new_moving_avg))
 
-                    neuron[k] = neuron[k] - (step_size * param_gradient)
-
-            # Updating biases
-            for j in range(len(biases)):
-                param_last_step_size = layer.moving_avg[j + 1]
-
-                param_gradient = layer.deltas[j + 1]
-
-                new_moving_avg = param_moving_avg(
-                    param_last_step_size,
-                    param_gradient
-                )
-
-                layer.moving_avg[j + 1] = new_moving_avg
-
-                step_size = self.lr / (1e-8 + math.sqrt(new_moving_avg))
-
-                biases[j] = biases[j] - (step_size * param_gradient)
+                    neuron.weights[k] -= step_size * param_gradient
 
     def optimize(self, x, y, epochs):
         if len(x) == 0:
@@ -147,15 +128,29 @@ class MLP:
         for i in range(epochs):
             predictions = []
             for j, sample in enumerate(x):
-                next_layer_input_data = sample
-                for k, layer in enumerate(self.layers):
-                    next_layer_input_data = layer.feed_layer(next_layer_input_data)
+                next_layer_input_data = self.evaluate(sample)
 
-                predictions.append(next_layer_input_data)
+                output = self.classify_function(next_layer_input_data)
+                predictions.append(output)
 
                 self.backward_propagate_error(y[j])
                 self.update_params()
 
             print(f'Epoch={i} Loss: {log_loss(np.array(y).ravel(), np.array(predictions).ravel())}'
-                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}')
-                  # f' --- Preds: {np.array(predictions).ravel()}')
+                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}'
+                  f' --- Preds: {np.array(predictions).ravel()}')
+
+    def evaluate(self, x):
+        if len(x) != self.input_dim:
+            raise TypeError('Data does not have the same input dimension as the network.')
+
+        next_layer_input_data = x
+        for k, layer in enumerate(self.layers):
+            next_layer_input_data = layer.feed_layer(next_layer_input_data)
+
+        return next_layer_input_data
+
+    def predict(self, x):
+        prediction = self.evaluate(x)
+
+        return self.classify_function(prediction)
