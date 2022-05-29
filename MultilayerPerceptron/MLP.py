@@ -12,6 +12,10 @@ def accuracy_metric(actual, predicted):
     return correct / float(len(actual)) * 100.0
 
 
+def param_moving_avg(last_step_size, delta):
+    return (0.99 * last_step_size) + ((1 - 0.99) * (delta ** 2))
+
+
 class MLP:
     def __init__(self, lr=0.01):
         self.input_dim = 0
@@ -22,18 +26,18 @@ class MLP:
     def add_layer(self, layer):
         if len(self.layers) == 0:
             self.input_dim = layer.input_dim
+        
         self.layers.append(layer)
 
         for i in range(len(self.layers) - 1):
             if self.layers[i].next_layer is None:
                 self.layers[i].set_next_layer(self.layers[i + 1])
-            # self.layers[i + 1].set_input_dim(self.layers[i].output_dim)
+            
             self.layers[i].layer_name = f'{i}'
         self.layers[-1].layer_name = f'{len(self.layers) - 1}'
 
     def get_layers(self):
-        for layer in self.layers:
-            print(layer)
+        return self.layers
 
     def backward_propagate_error(self, expected_output):
         # https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/
@@ -47,37 +51,49 @@ class MLP:
 
                 current_layer_output = current_layer.layer_output
                 for j, neuron in enumerate(current_layer_weights):
+                    # The neuron output relative error
                     next_layer_relative_error = 0
-                    next_layer_weights = next_layer.get_weights()
 
+                    next_layer_weights = next_layer.get_weights()
                     next_layer_deltas = next_layer.deltas[0]
+
                     for l in range(len(next_layer_weights)):
                         next_layer_relative_error += next_layer_deltas[l][j] * next_layer_weights[l][j]
 
                     for k, neuron_weights in enumerate(neuron):
-                        delta_h_i__net_h_i = current_layer.activation_derivative(current_layer_output[j])
+                        # How much the output of h_i change with respect the neuron input
+                        neuron_input_delta = current_layer.activation_derivative(current_layer_output[j])
 
                         # Calcualting weight delta
-                        current_layer.deltas[0][j][k] = delta_h_i__net_h_i * next_layer_relative_error
+
+                        # The "How much the total neuron input changes with respect to w_i" value
+                        # is calculated when updating the parameter. This is just the output
+                        # from previous layer related to w_i
+                        current_layer.deltas[0][j][k] = neuron_input_delta * next_layer_relative_error
+
                     # Calcualting bias delta
-                    current_layer.deltas[j + 1] -= current_layer.activation_derivative(current_layer_output[i])
+                    # current_layer.deltas[j + 1] = current_layer.activation_derivative(current_layer_output[i])
+                    current_layer.deltas[j + 1] = current_layer.deltas[0][j][0]
             else:
                 current_layer_output = current_layer.layer_output
                 for j, neuron in enumerate(current_layer_weights):
                     for k, neuron_weights in enumerate(neuron):
-                        # EQ1
-                        output_delta = -(expected_output[j] - current_layer_output[j])
+                        # How much the error change with respect to the output
+                        output_delta = current_layer_output[j] - expected_output[j]
 
-                        # EQ2
+                        # How much the output of o_i change with respect the neuron input
                         neuron_input_delta = current_layer.activation_derivative(current_layer_output[j])
 
                         # Calculating weight delta
-                        # The total net input of o_i change with respect to w_i (EQ3) is used directly in the weight
-                        # update so it's easier to calculate the hidden layer delta
+
+                        # The "How much the total neuron input changes with respect to w_i" value
+                        # is calculated when updating the parameter. This is just the output
+                        # from previous layer related to w_i
                         current_layer.deltas[0][j][k] = output_delta * neuron_input_delta
 
                     # Calculating bias delta
-                    current_layer.deltas[j + 1] -= current_layer.activation_derivative(current_layer_output[j])
+                    # current_layer.deltas[j + 1] = current_layer.activation_derivative(current_layer_output[j])
+                    current_layer.deltas[j + 1] = current_layer.deltas[0][j][0]
 
     def update_params(self):
         for i in range(len(self.layers) - 1, -1, -1):
@@ -89,17 +105,17 @@ class MLP:
             # Updating weights
             for j, neuron in enumerate(weights):
                 for k in range(len(neuron)):
-                    param_last_step_size = layer.lrs[0][j][k]
+                    param_last_step_size = layer.moving_avg[0][j][k]
 
-                    # forward_pass_input[k] refer to the EQ3 for both output and hidden layer
+                    # forward_pass_input[k] is "How much the total neuron input changes with respect to w_i"
                     param_gradient = layer.deltas[0][j][k] * forward_pass_input[k]
 
-                    new_moving_avg = self.calculate_param_step_size(
+                    new_moving_avg = param_moving_avg(
                         param_last_step_size,
                         param_gradient
                     )
 
-                    layer.lrs[0][j][k] = new_moving_avg
+                    layer.moving_avg[0][j][k] = new_moving_avg
 
                     step_size = self.lr / (1e-8 + math.sqrt(new_moving_avg))
 
@@ -107,16 +123,16 @@ class MLP:
 
             # Updating biases
             for j in range(len(biases)):
-                param_last_step_size = layer.lrs[j + 1]
+                param_last_step_size = layer.moving_avg[j + 1]
 
                 param_gradient = layer.deltas[j + 1]
 
-                new_moving_avg = self.calculate_param_step_size(
+                new_moving_avg = param_moving_avg(
                     param_last_step_size,
                     param_gradient
                 )
 
-                layer.lrs[j + 1] = new_moving_avg
+                layer.moving_avg[j + 1] = new_moving_avg
 
                 step_size = self.lr / (1e-8 + math.sqrt(new_moving_avg))
 
@@ -124,7 +140,7 @@ class MLP:
 
     def optimize(self, x, y, epochs):
         if len(x) == 0:
-            raise ValueError('No data.')
+            raise ValueError('No data provided.')
         elif len(x[0]) != self.input_dim:
             raise TypeError('Data does not have the same input dimension as the network.')
 
@@ -141,8 +157,5 @@ class MLP:
                 self.update_params()
 
             print(f'Epoch={i} Loss: {log_loss(np.array(y).ravel(), np.array(predictions).ravel())}'
-                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}'
-                  f' --- Preds: {np.array(predictions).ravel()}')
-
-    def calculate_param_step_size(self, last_step_size, delta):
-        return (0.99 * last_step_size) + ((1 - 0.99) * (delta ** 2))
+                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}')
+                  # f' --- Preds: {np.array(predictions).ravel()}')
