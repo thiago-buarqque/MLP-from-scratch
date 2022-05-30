@@ -15,8 +15,8 @@ def accuracy_metric(actual, predicted):
     return correct / float(len(actual)) * 100.0
 
 
-def param_moving_avg(last_step_size, delta):
-    return (0.99 * last_step_size) + ((1 - 0.99) * (delta ** 2))
+def param_moving_avg(last_step_size, param_gradient):
+    return (0.99 * last_step_size) + ((1 - 0.99) * (param_gradient ** 2))
 
 
 class MLP:
@@ -127,18 +127,20 @@ class MLP:
 
         for i in range(epochs):
             predictions = []
+            raw_predictions = []
             for j, sample in enumerate(x):
                 next_layer_input_data = self.evaluate(sample)
 
                 output = self.classify_function(next_layer_input_data)
                 predictions.append(output)
+                raw_predictions.append(next_layer_input_data)
 
                 self.backward_propagate_error(y[j])
                 self.update_params()
 
-            print(f'Epoch={i} Loss: {log_loss(np.array(y).ravel(), np.array(predictions).ravel())}'
-                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}'
-                  f' --- Preds: {np.array(predictions).ravel()}')
+            print(f'Epoch={i} Loss: {log_loss(np.array(y).ravel(), np.array(raw_predictions).ravel())}'
+                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}')
+                  # f' --- Preds: {np.array(predictions).ravel()}')
 
     def evaluate(self, x):
         if len(x) != self.input_dim:

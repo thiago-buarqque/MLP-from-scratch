@@ -9,6 +9,12 @@ import matplotlib.pyplot as plt
 
 from MultilayerPerceptron.MLP import MLP
 from MultilayerPerceptron.Layer import Layer
+from MultilayerPerceptron.Neuron import Neuron
+
+from MultilayerPerceptron.ActivationFunctions import (
+    ACTIVATION_FUNCTIONS,
+    ACTIVATION_FUNCTIONS_DERIVATIVES
+)
 
 x_train = []
 x_test = []
@@ -42,18 +48,19 @@ if __name__ == '__main__':
     #
     # print(f'Len train: {len(x_train)}')
     # print(f'Len test: {len(x_test)}')
+    # print(len(x_train[0]))
 
     x_train = [[0, 0], [1, 0], [0, 1], [1, 1]]
     y_train = [[0], [1], [1], [0]]
 
-    net = MLP(lr=0.2, classify_function=classify)
-    hidden_layer_1 = Layer(input_dim=len(x_train[0]), neurons=2, activation_function="sigmoid")
-    output_layer = Layer(input_dim=2, neurons=len(y_train[0]), activation_function="sigmoid")
+    net = MLP(lr=0.01, classify_function=classify)
+    hidden_layer_1 = Layer(input_dim=len(x_train[0]), neurons=5, activation_function="sigmoid")
+    output_layer = Layer(input_dim=5, neurons=len(y_train[0]), activation_function="sigmoid")
 
     net.add_layer(hidden_layer_1)
     net.add_layer(output_layer)
 
-    net.optimize(x_train, y_train, epochs=1000)
+    net.optimize(x_train, y_train, epochs=500)
 
     """
     Generate plot of input data and decision boundary.
