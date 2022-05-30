@@ -18,12 +18,22 @@ def relu_derivative(x):
     return 0 if x < 0 else 1
 
 
+def tanh(x):
+    return numpy.tanh(x)
+
+
+def tanh_derivative(x):
+    return 1 - (numpy.tanh(x) ** 2)
+
+
 ACTIVATION_FUNCTIONS = {
     'sigmoid': sigmoid,
-    'relu': relu
+    'relu': relu,
+    'tanh': tanh
 }
 
 ACTIVATION_FUNCTIONS_DERIVATIVES = {
     'sigmoid': sigmoid_derivative,
-    'relu': relu_derivative
+    'relu': relu_derivative,
+    'tanh': tanh_derivative
 }
