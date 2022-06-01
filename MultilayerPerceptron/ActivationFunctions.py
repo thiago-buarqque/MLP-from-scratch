@@ -2,6 +2,14 @@ import math
 import numpy
 
 
+def linear(x):
+    return x
+
+
+def linear_derivative(x):
+    return 1
+
+
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
@@ -29,11 +37,13 @@ def tanh_derivative(x):
 ACTIVATION_FUNCTIONS = {
     'sigmoid': sigmoid,
     'relu': relu,
-    'tanh': tanh
+    'tanh': tanh,
+    'linear': linear
 }
 
 ACTIVATION_FUNCTIONS_DERIVATIVES = {
     'sigmoid': sigmoid_derivative,
     'relu': relu_derivative,
-    'tanh': tanh_derivative
+    'tanh': tanh_derivative,
+    'linear': linear_derivative
 }
