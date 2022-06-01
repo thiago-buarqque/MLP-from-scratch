@@ -11,7 +11,7 @@ class Layer:
     def __init__(self,
                  neurons: int,
                  input_dim: int,
-                 activation_function: str = 'sigmoid'
+                 activation_function: str = 'linear'
                  ):
         self.input_dim = input_dim
         self.output_dim = neurons

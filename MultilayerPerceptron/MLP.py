@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.metrics import log_loss
 
 from MultilayerPerceptron.Layer import Layer
+from MultilayerPerceptron.LossFunctions import LOSS_FUNCTIONS
 from MultilayerPerceptron.Neuron import Neuron
 
 
@@ -16,17 +17,22 @@ def accuracy_metric(actual, predicted):
 
 
 def param_moving_avg(last_step_size, param_gradient):
-    return (0.99 * last_step_size) + ((1 - 0.99) * (param_gradient ** 2))
+    return (0.9 * last_step_size) + ((1 - 0.9) * (param_gradient ** 2))
 
 
 class MLP:
-    def __init__(self, lr=0.01, classify_function=None):
+    def __init__(self, lr=0.01, classify_function=None, loss='mse'):
         self.input_dim = 0
 
         self.layers = []
         self.lr = lr
 
         self.classify_function = classify_function
+
+        if loss not in LOSS_FUNCTIONS.keys():
+            raise ValueError("Invalid loss function.")
+
+        self.loss = LOSS_FUNCTIONS[loss]
 
     def add_layer(self, layer):
         if len(self.layers) == 0:
@@ -131,16 +137,22 @@ class MLP:
             for j, sample in enumerate(x):
                 next_layer_input_data = self.evaluate(sample)
 
-                output = self.classify_function(next_layer_input_data)
-                predictions.append(output)
+                if self.classify_function is not None:
+                    output = self.classify_function(next_layer_input_data)
+                    predictions.append(output)
+
                 raw_predictions.append(next_layer_input_data)
 
-                self.backward_propagate_error(y[j])
+                self.backward_propagate_error([y[j]])
                 self.update_params()
 
-            print(f'Epoch={i} Loss: {log_loss(np.array(y).ravel(), np.array(raw_predictions).ravel())}'
-                  f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}')
-                  # f' --- Preds: {np.array(predictions).ravel()}')
+            log = f"Epoch={i} Loss: {self.loss(np.array(y).ravel(), np.array(raw_predictions).ravel())}"
+
+            if self.classify_function is not None:
+                log += f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}'
+
+            print(log)
+
 
     def evaluate(self, x):
         if len(x) != self.input_dim:
