@@ -135,15 +135,15 @@ class MLP:
             predictions = []
             raw_predictions = []
             for j, sample in enumerate(x):
-                next_layer_input_data = self.evaluate(sample)
+                raw_output = self.predict([sample])[0]
 
                 if self.classify_function is not None:
-                    output = self.classify_function(next_layer_input_data)
+                    output = self.classify_function(raw_output)
                     predictions.append(output)
 
-                raw_predictions.append(next_layer_input_data)
+                raw_predictions.append(raw_output)
 
-                self.backward_propagate_error([y[j]])
+                self.backward_propagate_error(y[j])
                 self.update_params()
 
             log = f"Epoch={i} Loss: {self.loss(np.array(y).ravel(), np.array(raw_predictions).ravel())}"
@@ -153,18 +153,26 @@ class MLP:
 
             print(log)
 
-
-    def evaluate(self, x):
-        if len(x) != self.input_dim:
+    def predict(self, x):
+        if len(x[0]) != self.input_dim:
             raise TypeError('Data does not have the same input dimension as the network.')
 
-        next_layer_input_data = x
-        for k, layer in enumerate(self.layers):
-            next_layer_input_data = layer.feed_layer(next_layer_input_data)
+        predicts = []
+        for sample in x:
+            output = sample
+            for k, layer in enumerate(self.layers):
+                output = layer.feed_layer(output)
 
-        return next_layer_input_data
+            predicts.append(output)
 
-    def predict(self, x):
+        return predicts
+
+    def evaluate(self, x):
+        """
+        Make a prediction and classify it using the classify function
+        :param x:
+        :return: The proper class for the network prediction
+        """
         prediction = self.evaluate(x)
 
         return self.classify_function(prediction)
