@@ -1,36 +1,34 @@
 import math
 
 import numpy as np
-from sklearn.metrics import log_loss
 
 from MultilayerPerceptron.Layer import Layer
-from MultilayerPerceptron.LossFunctions import LOSS_FUNCTIONS
 from MultilayerPerceptron.Neuron import Neuron
 
-
-def accuracy_metric(actual, predicted):
-    correct = 0
-    for i in range(len(actual)):
-        if actual[i] == predicted[i]:
-            correct += 1
-    return correct / float(len(actual)) * 100.0
-
-
-def param_moving_avg(last_step_size, param_gradient):
-    return (0.9 * last_step_size) + ((1 - 0.9) * (param_gradient ** 2))
+from MultilayerPerceptron.LossFunctions import LOSS_FUNCTIONS
+from MultilayerPerceptron.Metrics import METRICS
 
 
 class MLP:
-    def __init__(self, lr=0.01, classify_function=None, loss='mse'):
+    def __init__(self, lr=0.01, classify_function=None, loss="mse"):
         self.input_dim = 0
 
         self.layers = []
         self.lr = lr
 
+        """
+        Used for binary classification. Returns 0 or 1 based on a user condition
+        
+        Example:
+        def classify_function(net_output):
+            if net_output > 0.5:
+                return 1
+            return 0
+        """
         self.classify_function = classify_function
 
         if loss not in LOSS_FUNCTIONS.keys():
-            raise ValueError("Invalid loss function.")
+            raise ValueError(f"'{loss}' is not a valid loss function.")
 
         self.loss = LOSS_FUNCTIONS[loss]
 
@@ -44,13 +42,17 @@ class MLP:
             if self.layers[i].next_layer is None:
                 self.layers[i].set_next_layer(self.layers[i + 1])
             
-            self.layers[i].layer_name = f'{i}'
-        self.layers[-1].layer_name = f'{len(self.layers) - 1}'
+            self.layers[i].layer_name = f"{i}"
+        self.layers[-1].layer_name = f"{len(self.layers) - 1}"
 
     def get_layers(self):
         return self.layers
 
-    def backward_propagate_error(self, expected_output):
+    # RMSProp moving average
+    def _param_moving_avg(self, last_step_size, param_gradient):
+        return (0.9 * last_step_size) + ((1 - 0.9) * (param_gradient ** 2))
+
+    def _backward_propagate_error(self, expected_output):
         # https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/
         for i in range(len(self.layers) - 1, -1, -1):
             layer = self.layers[i]
@@ -95,7 +97,7 @@ class MLP:
                     # from previous layer related to w_i
                     neuron.set_delta(output_delta * neuron_input_delta)
 
-    def update_params(self):
+    def _update_params(self):
         for i in reversed(range(len(self.layers))):
             layer: Layer = self.layers[i]
 
@@ -114,7 +116,7 @@ class MLP:
                         # It's the neuron bias
                         param_gradient = neuron.delta
 
-                    new_moving_avg = param_moving_avg(
+                    new_moving_avg = self._param_moving_avg(
                         last_moving_avg,
                         param_gradient
                     )
@@ -125,11 +127,14 @@ class MLP:
 
                     neuron.weights[k] -= step_size * param_gradient
 
-    def optimize(self, x, y, epochs):
+    def optimize(self, x, y, epochs, metrics=None):
         if len(x) == 0:
-            raise ValueError('No data provided.')
+            raise ValueError("No data provided.")
         elif len(x[0]) != self.input_dim:
-            raise TypeError('Data does not have the same input dimension as the network.')
+            raise TypeError("Data does not have the same input dimension as the network.")
+
+        if metrics is not None:
+            self._validate_metrics(metrics)
 
         for i in range(epochs):
             predictions = []
@@ -143,19 +148,19 @@ class MLP:
 
                 raw_predictions.append(raw_output)
 
-                self.backward_propagate_error(y[j])
-                self.update_params()
+                self._backward_propagate_error(y[j])
+                self._update_params()
 
-            log = f"Epoch={i} Loss: {self.loss(np.array(y).ravel(), np.array(raw_predictions).ravel())}"
+            log = f"Epoch={i} Loss (train): {self.loss(np.array(y).ravel(), np.array(raw_predictions).ravel())}"
 
-            if self.classify_function is not None:
-                log += f' Accuracy: {accuracy_metric(np.array(y).ravel(), np.array(predictions).ravel())}'
+            for metric in metrics:
+                log += f" {metric} (train): {METRICS[metric](y, raw_predictions)}"
 
             print(log)
 
     def predict(self, x):
         if len(x[0]) != self.input_dim:
-            raise TypeError('Data does not have the same input dimension as the network.')
+            raise TypeError("Data does not have the same input dimension as the network.")
 
         predicts = []
         for sample in x:
@@ -176,3 +181,8 @@ class MLP:
         prediction = self.evaluate(x)
 
         return self.classify_function(prediction)
+
+    def _validate_metrics(self, metrics: [str]):
+        for metric in metrics:
+            if metric not in METRICS.keys():
+                raise ValueError(f"'{metric}' is not a valid metric.")

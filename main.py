@@ -1,17 +1,9 @@
 import math
 
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from MultilayerPerceptron.MLP import MLP
 from MultilayerPerceptron.Layer import Layer
-
-
-def classify(net_output):
-    if net_output >= 0.5:
-        return 1
-
-    return 0
 
 
 def handle_nan_values(dataset, current_row_counter, new_row, backup_column):
@@ -55,23 +47,19 @@ def generate_dataset(dataset, desired_column, backup_column, period=5):
 
 
 if __name__ == '__main__':
-    acoes = pd.read_csv('./acoes_bb_2017_2022.csv')
+    data = pd.read_csv('./acoes_bb_2020_2022.csv')
 
     period = 5
-    acoes = generate_dataset(acoes, desired_column="Open",
+    acoes = generate_dataset(data, desired_column="Open",
                              backup_column="Close", period=period)
 
-    real_world_data = acoes.tail(5)
+    real_world_data: [float] = acoes.tail((period * 2) - 1).pop('DiaObj').values.tolist()
 
-    acoes.drop(acoes.tail(5).index, inplace=True)
     x_train = acoes.sample(frac=0.9)
     x_test = acoes.drop(x_train.index)
 
     y_train = x_train.pop('DiaObj')
     y_test = x_test.pop('DiaObj')
-
-    real_labels = real_world_data.pop('DiaObj').values.tolist()
-    real_world_data = real_world_data.values.tolist()
 
     x_train = x_train.values.tolist()
     x_test = x_test.values.tolist()
@@ -85,19 +73,20 @@ if __name__ == '__main__':
     net.add_layer(hidden_layer_1)
     net.add_layer(output_layer)
 
-    net.optimize(x_train, y_train, epochs=100)
+    net.optimize(x_train, y_train, epochs=50, metrics=['mae'])
 
-    preds = net.predict(real_world_data)
+    # Separa os últimos 9 dias para ser usado como entrada para prever os próximos 5 dias
+    last_n_days = []
 
-    print(f"\nPredictions: {list(preds)}")
-    print(f"Real: {list(real_labels)}")
+    j = period - 1
+    while j <= len(real_world_data) - 1:
+        day = []
+        for i in reversed(range(period)):
+            day.append(float(real_world_data[j - i]))
 
-    plt.scatter(real_labels, preds)
-    plt.xlabel('True Values')
-    plt.ylabel('Predictions')
-    plt.axis('equal')
-    plt.axis('square')
-    plt.xlim([0, plt.xlim()[1]])
-    plt.ylim([0, plt.ylim()[1]])
-    plt.plot([-100, 100], [-100, 100])
-    plt.show()
+        last_n_days.append(day)
+
+        j += 1
+
+    preds = net.predict(last_n_days)
+    print(f"\nNetwork predictions: {preds}")
